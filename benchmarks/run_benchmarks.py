@@ -28,18 +28,18 @@ def start_workers(num_workers=3):
     return processes
 
 
-def start_load_balancer():
-    """Start load balancer server."""
+def _run_uvicorn():
+    """Helper function to run uvicorn (needed for multiprocessing)."""
     import uvicorn
     sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
     from server import app
+    uvicorn.run(app, host="127.0.0.1", port=8000, log_level="warning")
 
+
+def start_load_balancer():
+    """Start load balancer server."""
     # Run in subprocess
-    p = multiprocessing.Process(
-        target=lambda: uvicorn.run(
-            app, host="127.0.0.1", port=8000, log_level="warning"
-        )
-    )
+    p = multiprocessing.Process(target=_run_uvicorn)
     p.start()
     print("Started load balancer on port 8000")
     return p

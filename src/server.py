@@ -15,7 +15,7 @@ logger = logging.getLogger(__name__)
 app = FastAPI()
 
 
-class InferenceRequest(BaseModel):
+class InferenceRequestInput(BaseModel):
     prompt: str
 
 
@@ -87,7 +87,7 @@ async def health_check():
 
 
 @app.post("/infer")
-async def infer(request: InferenceRequest) -> InferenceResponse:
+async def infer(request: InferenceRequestInput) -> InferenceResponse:
     """Submit inference request and route to worker."""
     if not load_balancer or not predictor:
         raise HTTPException(status_code=500, detail="Server not initialized")
