@@ -120,7 +120,7 @@ locust -f benchmarks/locustfile.py \
 ## Next Steps
 
 ### 1. Understand the Code
-- Read `CLAUDE.md` for architecture overview
+- Read `ARCHITECTURE.md` for system design
 - Review `src/predictor.py` for prediction logic
 - Check `src/load_balancer.py` for routing strategies
 
@@ -181,7 +181,7 @@ smart-load-balancer/
 │   ├── run_benchmarks.py   # Benchmark harness
 │   └── README.md           # Benchmarking guide
 ├── README.md               # Project overview
-├── CLAUDE.md               # AI instructions & architecture
+├── ARCHITECTURE.md         # System design & architecture
 ├── GETTING_STARTED.md      # This file
 ├── requirements.txt        # Python dependencies
 └── .gitignore
@@ -220,7 +220,7 @@ smart-load-balancer/
 ## Questions?
 
 - See `README.md` for project overview
-- Check `CLAUDE.md` for implementation details
+- Check `ARCHITECTURE.md` for implementation details
 - Review `benchmarks/README.md` for measurement guide
 - Look at test files for usage examples
 
