@@ -1,0 +1,32 @@
+seed: 42
+
+models:
+  - name: "mistralai/Mistral-7B-Instruct-v0.1"
+    max_tokens: 256
+  - name: "meta-llama/Llama-2-7b-chat-hf"
+    max_tokens: 256
+  - name: "microsoft/phi-2"
+    max_tokens: 256
+
+dataset:
+  name: "alpaca"
+  num_prompts: 500
+
+vllm:
+  gpu_memory_utilization: 0.9
+  batch_size: 1
+  max_model_len: 512
+  kv_cache_dtype: "fp8"
+  cpu_offload_gb: 16
+  enforce_eager: false
+
+predictor:
+  ridge_alpha: 1.0
+  train_split: 0.8
+
+smart_routing:
+  cost_threshold: 500
+
+a_b_test:
+  requests_per_strategy: 250
+  num_workers: 3
