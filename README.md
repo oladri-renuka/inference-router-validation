@@ -15,6 +15,8 @@ python benchmarks/simple_benchmark.py
 
 ## Validation Results
 
+**Note**: Single unseeded run (August 2026). Results not independently replicated.
+
 - Mean latency: 17% improvement (2947ms → 2447ms, p=0.0152)
 - P95 latency: 0.2% improvement (not statistically tested)
 - Predictor: R²=0.114 (weak predictive signal)
@@ -23,7 +25,7 @@ python benchmarks/simple_benchmark.py
 
 ## What It Does
 
-Routes high-complexity LLM requests to underutilized workers by predicting output length before dispatch. Strategy: if predicted_tokens > threshold, route to least-loaded worker; otherwise use round-robin.
+Routes LLM requests based on predicted output length: if predicted_tokens > threshold, route to least-loaded worker; otherwise use round-robin. Whether the binary threshold (500 tokens) effectively separates long-output requests in practice is not validated — see Limitations in DOCUMENTATION.md.
 
 ## Key Components
 

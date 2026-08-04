@@ -431,6 +431,8 @@ Suitable for: Cost optimization, average response time improvement, best-effort 
 
 ### No Significant Difference (p ≥ 0.05)
 
+**Illustrative example** (not from this validation):
+
 Observation:
 ```
 Smart mean:   2650ms
@@ -495,9 +497,9 @@ Consequence: Claiming "P95 improved significantly" based on this p-value is inco
 
 Issue: No fixed seed in config or notebook.
 
-Effect: Running validation twice produces slightly different results.
+Effect: All reported numbers (R²=0.114, mean diff=501ms, p=0.0152) come from a single unseeded run. A second independent run is needed to verify these results are stable, not a statistical artifact of that particular random seed.
 
-Current state: Not reproducible to bit-level.
+Current state: Single point estimate, not independently replicated. "Validation complete" should not be interpreted as "these results are reproducible on second run"—only as "this one run shows these numbers with these caveats."
 
 ### Sample Size for Tail Estimates
 
@@ -506,6 +508,14 @@ P95 estimation: From ~12-13 samples (top 5% of n=250).
 Consequence: High variance in percentile estimates. 14ms difference is likely noise.
 
 Improvement: Increase n to 1000+ per strategy, or use bootstrap CI for percentiles.
+
+### vLLM Configuration: enforce_eager=true
+
+Configuration setting: `enforce_eager: true` disables PagedAttention and CUDA graph optimizations.
+
+Implication: Absolute latency numbers (2447ms mean, 6056ms P95) are from the slowest vLLM mode, not production-representative. Production deployments typically run with PagedAttention enabled for lower latency.
+
+Scope impact: Relative comparison (smart vs round-robin) is likely stable regardless of this setting, but absolute latencies are not production-representative.
 
 ---
 
