@@ -1,8 +1,10 @@
 # Smart Load Balancer for LLM Inference
 
-Intelligent request routing for LLM inference based on predicted output length. Reduces p95 latency by 13-20% compared to round-robin.
+Intelligent request routing for LLM inference based on predicted output length.
 
-**[📖 Full Documentation →](docs/source/index.md)**
+**Validation Results** (August 2026): Mean latency improved 17% (501ms, p=0.0152). P95 tail latency unchanged (14ms improvement, not statistically validated).
+
+**[Documentation →](DOCUMENTATION.md) | [Validation Plan →](VALIDATION_PLAN.md) | [Full Docs →](docs/source/index.md)**
 
 ## Quick Start
 
@@ -11,17 +13,17 @@ pip install -r requirements.txt
 python benchmarks/simple_benchmark.py
 ```
 
-## Key Stats
+## Validation Results
 
-- ✓ 100% test pass rate (11/11 tests)
-- ✓ 13-20% p95 latency improvement
-- ✓ 1.45-1.70 req/s throughput
-- ✓ Zero errors in 87+ benchmark requests
-- ✓ Production-ready code
+- Mean latency: 17% improvement (2947ms → 2447ms, p=0.0152)
+- P95 latency: 0.2% improvement (not statistically tested)
+- Predictor: R²=0.114 (weak predictive signal)
+- Sample size: 250 requests per strategy
+- Dataset: 500 Alpaca prompts on Mistral 7B
 
 ## What It Does
 
-Routes high-complexity LLM requests to underutilized workers by predicting output length before dispatch. Simple but effective: high-cost → least-loaded, low-cost → round-robin.
+Routes high-complexity LLM requests to underutilized workers by predicting output length before dispatch. Strategy: if predicted_tokens > threshold, route to least-loaded worker; otherwise use round-robin.
 
 ## Key Components
 
