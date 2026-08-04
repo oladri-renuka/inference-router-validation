@@ -1,47 +1,62 @@
-# Smart Load Balancer for LLM Inference
+# Inference Router Validation
 
-Intelligent request routing for LLM inference based on predicted output length.
+Experimental validation of predicted-cost routing for LLM inference: does predicting output token count before inference allow better load balancing than round-robin?
 
-**Validation Results** (August 2026): Mean latency improved 17% (501ms, p=0.0152). P95 tail latency unchanged (14ms improvement, not statistically validated).
+## Status
 
-**[Documentation →](DOCUMENTATION.md) | [Validation Plan →](VALIDATION_PLAN.md) | [Full Docs →](docs/source/index.md)**
+**Experimental validation only.** Single unseeded run (August 2026), not independently replicated. Not production-ready code.
 
-## Quick Start
+## Hypothesis
 
-```bash
-pip install -r requirements.txt
-python benchmarks/simple_benchmark.py
-```
+Ridge regression model predicts output token counts from prompts. Requests predicted to exceed a threshold (500 tokens) routed to least-loaded worker; others use round-robin. Hypothesis: this improves latency compared to round-robin baseline.
 
-## Validation Results
+## Results
 
-**Note**: Single unseeded run (August 2026). Results not independently replicated.
+**Mean latency**: 17% improvement (2947ms → 2447ms, p=0.0152) on this run.
 
-- Mean latency: 17% improvement (2947ms → 2447ms, p=0.0152)
-- P95 latency: 0.2% improvement (not statistically tested)
-- Predictor: R²=0.114 (weak predictive signal)
-- Sample size: 250 requests per strategy
-- Dataset: 500 Alpaca prompts on Mistral 7B
+**P95 tail latency**: 0.2% improvement (6070ms → 6056ms), not statistically tested. Operationally unchanged.
 
-## What It Does
+**Predictor accuracy**: R²=0.114. Weak predictive signal; 89% of output-length variance unexplained.
 
-Routes LLM requests based on predicted output length: if predicted_tokens > threshold, route to least-loaded worker; otherwise use round-robin. Whether the binary threshold (500 tokens) effectively separates long-output requests in practice is not validated — see Limitations in DOCUMENTATION.md.
+**Threshold validation**: Missing. Whether the 500-token threshold actually separates long-output requests is unvalidated.
 
-## Key Components
+**Reproducibility**: Single point estimate from unseeded run. Second independent run needed to verify these results are stable.
 
-- **Prediction** - Ridge regression predicts output tokens from prompts
-- **Load Balancer** - Routes requests intelligently
-- **Health Monitor** - Async worker health checks
-- **Metrics** - Real-time latency & throughput tracking
+## What This Means
+
+- Average-case latency can improve via predicted-cost routing (one data point)
+- Tail latency (P95/P99) does not improve in this validation
+- Predictor is too weak to claim routing strategy works as designed
+- Results may not replicate on second run
+- Unsuitable for strict SLAs or production deployment without further validation
+
+## Key Limitations
+
+1. **Single run**: No independent replication
+2. **Weak predictor**: R²=0.114 (threshold effectiveness unvalidated)
+3. **P95 unchanged**: Not suitable for tail-latency SLAs
+4. **Simulated environment**: Single GPU, 3 workers (not distributed cluster)
+5. **Absolute latencies**: From conservative vLLM config (enforce_eager=true)
+6. **Single model/dataset**: Mistral 7B + Alpaca only
 
 ## Documentation
 
-Full documentation available in [`docs/source/`](docs/source/):
+**Start here**: [DOCUMENTATION.md](DOCUMENTATION.md) — Technical reference on components, methodology, results interpretation, and all limitations.
 
-- [Getting Started](docs/source/getting_started.md) - Setup & first run
-- [Architecture](docs/source/architecture.md) - System design
-- [Benchmarks](docs/source/benchmarks.md) - Performance results
-- [Benchmarking Guide](docs/source/benchmarking_guide.md) - Run your own tests
+**Methodology**: [VALIDATION_PLAN.md](VALIDATION_PLAN.md) — What was tested, success criteria, what succeeded and failed.
+
+**Older docs**: [`docs/source/`](docs/source/) — Previous architectural documentation (may be outdated).
+
+## Implementation
+
+The codebase contains implementations of:
+
+- Ridge regression predictor for output length
+- Load balancer with round-robin, least-loaded, and predicted-cost strategies
+- Statistics module for A/B testing with t-tests and confidence intervals
+- Validation notebook that orchestrates the full experiment
+
+See DOCUMENTATION.md for component details.
 
 ## Contributing
 
