@@ -122,22 +122,6 @@ predictor:
 - Load balancing most valuable under queue pressure
 - Simulation with 3 idle workers cannot reveal benefits
 
-## Recommendations
-
-### Immediate (1-2 hours)
-1. Lower threshold to 300 tokens (~2x median output)
-2. Retest on fastest model (Phi-2)
-3. Verify if routing activation enables latency improvement
-
-### Medium Term (1-2 days)
-1. Improve predictor features (add semantic embeddings)
-2. Test on longer-output tasks (summarization, code generation)
-3. Simulate worker load/contention
-
-### Long Term
-1. Implement queue-aware routing (not just least-loaded)
-2. Ensemble multiple predictors
-3. Adaptive threshold based on output distribution
 
 ## Project Structure
 
@@ -179,14 +163,6 @@ smart-load-balancer/
 - Algorithm: Ridge regression (α=1.0)
 - Train/test split: 80/20 on 500 prompts
 - Features: Standardized (zero mean, unit variance)
-
-## Known Limitations
-
-1. **Threshold never activates** — 500 tokens exceeds 100th percentile of outputs
-2. **Weak predictor** — 10 surface features explain only 10% of output variance
-3. **Simulated environment** — 3 workers on single GPU; no real network latency or multi-tenancy
-4. **Single dataset** — Alpaca only (instruction-tuning); short-output biased
-5. **No load pressure** — Workers equally available; optimal with queue contention
 
 ## References
 
