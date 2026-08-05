@@ -1,30 +1,60 @@
 # Smart Load Balancer for LLM Inference
 
-Intelligent request routing for LLM inference based on predicted output length. Routes high-complexity requests to underutilized workers via least-loaded strategy; low-complexity requests use round-robin. Validated on Mistral 7B with Alpaca dataset.
+A production-grade load balancing system for distributed LLM inference that routes requests based on predicted output length before dispatching to workers.
 
-## Performance
+## Overview
 
-- **Mean latency**: 17% improvement over round-robin baseline (2947ms → 2447ms, p=0.0152)
-- **Throughput**: Equivalent to round-robin (routing overhead negligible)
-- **P95 latency**: Unchanged (+0.2%, within noise)
-- **Predictor accuracy**: R²=0.114 (weak signal, but sufficient for binary threshold)
+This project implements intelligent request routing for LLM inference workloads. Instead of round-robin load balancing, the system predicts output token count from prompt features and routes accordingly: high-predicted-cost requests go to underloaded workers; low-cost requests distribute uniformly.
 
-**Validation**: 500 real Mistral 7B inferences from Alpaca dataset. 250 requests per strategy. Independent t-tests with 95% confidence intervals.
+**Status**: Validation complete. No statistically significant latency improvement detected with current configuration (p > 0.50 across all models tested).
+
+## Validation Results
+
+| Metric | Llama-2 | Mistral | Phi-2 |
+|--------|---------|---------|--------|
+| **P95 Improvement** | -0.15% | +0.01% | -4.65% |
+| **p-value** | 0.870 | 0.789 | 0.509 |
+| **Significant?** | No | No | No |
+| **Predictor R²** | 0.109 | 0.095 | -0.061 |
+
+### Key Finding
+
+Smart routing showed no measurable latency benefit (p > 0.50 across three models, 166 requests per strategy). **Root cause**: The 500-token routing threshold never activated—outputs clustered below 250 tokens, making smart routing and round-robin functionally identical.
 
 ## How It Works
 
 ```
-For each request:
-  1. Extract prompt features (length, vocabulary, code markers, etc.)
-  2. Predict output token count via Ridge regression
-  3. If predicted > 500 tokens:
-       Route to least-loaded worker
-     Else:
-       Route via round-robin
-  4. Send to worker, measure latency
+1. Extract prompt features (length, entropy, code markers, etc.)
+2. Predict output token count via Ridge regression
+3. Route high-cost requests (> threshold) to least-loaded worker
+4. Route low-cost requests via round-robin
+5. Measure latency and token count
 ```
 
-**Rationale**: Long-context requests benefit more from load-balancing (they take longer, so load matters). Short requests finish quickly regardless; round-robin keeps them simple.
+## Architecture
+
+### Components
+
+| Component | File | Purpose |
+|-----------|------|---------|
+| **PromptFeatureExtractor** | `utils/predictor.py` | Extract 10 features from prompt |
+| **OutputLengthPredictor** | `utils/predictor.py` | Ridge regression for token prediction |
+| **LoadBalancer** | `utils/load_balancer.py` | Route requests via smart/round-robin/least-loaded |
+| **VLLMInference** | `utils/inference.py` | vLLM wrapper with GPU memory management |
+| **StatisticalTest** | `utils/statistics.py` | Compute latency distributions and t-tests |
+
+### Prompt Features
+
+- `prompt_length` — Character count
+- `word_count` — Token estimate
+- `vocabulary_entropy` — Lexical complexity
+- `question_marks` — Query signal
+- `code_markers` — Code detection
+- `imperative_verbs` — Task type
+- `punctuation_density` — Structure signal
+- `uppercase_density` — Emphasis markers
+- `sentence_count` — Discourse structure
+- `digit_presence` — Numerical reasoning
 
 ## Installation
 
@@ -35,213 +65,136 @@ pip install -r requirements.txt
 ## Quick Start
 
 ```bash
-python benchmarks/simple_benchmark.py
+jupyter notebook validation_notebook.ipynb
 ```
 
-Runs 50 requests through the load balancer and prints latency statistics.
-
-## Architecture
-
-### Components
-
-**Predictor** (`utils/predictor.py`)
-- Ridge regression model (α=1.0)
-- Extracts 8 features: prompt length, word count, vocabulary entropy, question density, code markers, imperative verbs, punctuation, uppercase
-- Trains on 80% of data, evaluates on 20%
-- Output: predicted token count (continuous value)
-
-**Load Balancer** (`utils/load_balancer.py`)
-- Routes requests to workers via one of three strategies:
-  - ROUND_ROBIN: Cycle through workers
-  - LEAST_LOADED: Route to worker with lowest (active_requests * 0.7 + avg_latency * 0.3)
-  - PREDICTED_COST: Hybrid (threshold-based)
-- Tracks worker metrics: active requests, total requests, average latency, error count
-
-**Inference** (`utils/inference.py`)
-- Wraps vLLM for Mistral 7B
-- Measures per-request latency
-- Configuration: gpu_memory_utilization=0.9, max_model_len=512, kv_cache_dtype="fp8"
-
-**Statistics** (`utils/statistics.py`)
-- Independent t-tests on mean latency
-- Confidence intervals using t-distribution
-- Percentile summaries (P50, P95, P99)
-
-### Data Flow
-
-```
-Alpaca Dataset (500 prompts)
-  ↓
-Mistral 7B Inference (collect output tokens + latency)
-  ↓
-Train Predictor (Ridge regression, 80/20 split)
-  ↓
-A/B Test (250 requests per strategy)
-  ├─ Smart Routing (predicted-cost strategy)
-  └─ Round-Robin (baseline)
-  ↓
-Statistical Analysis
-  ├─ Mean latency comparison (t-test)
-  ├─ Percentile summary
-  └─ Confidence intervals
-```
+Runs full validation pipeline:
+1. Load 500 Alpaca prompts
+2. Inference on 3 models (Llama-2, Mistral, Phi-2)
+3. Train predictor on 400 samples, validate on 100
+4. A/B test 166 requests per strategy
+5. Compute statistics and p-values
 
 ## Configuration
 
 Edit `config.yaml`:
 
 ```yaml
-model:
-  name: "mistralai/Mistral-7B-Instruct-v0.1"
-  max_tokens: 256
+models:
+  - name: "mistralai/Mistral-7B-Instruct-v0.1"
+    max_tokens: 256
+  - name: "microsoft/phi-2"
+    max_tokens: 256
 
 dataset:
   name: "alpaca"
   num_prompts: 500
 
 vllm:
-  gpu_memory_utilization: 0.9
+  gpu_memory_utilization: 0.7
   batch_size: 1
   max_model_len: 512
-  kv_cache_dtype: "fp8"
-  cpu_offload_gb: 16
-  enforce_eager: true
-
-predictor:
-  ridge_alpha: 1.0
+  kv_cache_dtype: "auto"
 
 smart_routing:
-  cost_threshold: 500
+  cost_threshold: 500  # Adjust for activation rate
 
-a_b_test:
-  requests_per_strategy: 250
+predictor:
+  model_types: ["ridge", "lasso", "elasticnet"]
+  alpha: 1.0
 ```
 
-**Tuning notes**:
-- If OOM: reduce `gpu_memory_utilization` (0.9 → 0.7 → 0.5)
-- If high latency variance: reduce `max_model_len` or increase timeout
-- Optimal threshold depends on your output-length distribution (500 is arbitrary)
+## Why It Didn't Work
 
-## Validation Results
+### Threshold Too High
+- Output tokens: 1-256 (median ~160)
+- Routing threshold: 500 tokens
+- Activation rate: 0%
+- Result: Routing logic never engaged
 
-### Setup
+### Weak Predictor
+- Ridge regression R²: 0.09-0.11
+- MAE: ~80 tokens
+- Explanation: Only 10% of output variance captured by surface features
 
-- Model: Mistral 7B-Instruct-v0.1
-- Dataset: Alpaca (500 instruction-following prompts)
-- Inference: Real vLLM (not synthetic)
-- Sample size: 250 requests per strategy
-- A/B test: Independent t-tests, 95% CI
+### No Load Contention
+- All workers equally available
+- Load balancing most valuable under queue pressure
+- Simulation with 3 idle workers cannot reveal benefits
 
-### Results
+## Recommendations
 
-**Mean Latency** (statistically significant)
+### Immediate (1-2 hours)
+1. Lower threshold to 300 tokens (~2x median output)
+2. Retest on fastest model (Phi-2)
+3. Verify if routing activation enables latency improvement
+
+### Medium Term (1-2 days)
+1. Improve predictor features (add semantic embeddings)
+2. Test on longer-output tasks (summarization, code generation)
+3. Simulate worker load/contention
+
+### Long Term
+1. Implement queue-aware routing (not just least-loaded)
+2. Ensemble multiple predictors
+3. Adaptive threshold based on output distribution
+
+## Project Structure
+
 ```
-Smart routing:    2446.6ms (std=2272.2ms)
-Round-robin:      2947.7ms (std=2317.4ms)
-Improvement:      501ms (17%)
-t-statistic:      -2.436
-p-value:          0.0152
-95% CI:           [2163ms, 2730ms]
-
-Conclusion: Mean latency difference is statistically significant.
-Smart routing is 501ms faster on average.
+smart-load-balancer/
+├── README.md                          (this file)
+├── config.yaml                        (configuration)
+├── validation_notebook.ipynb          (validation pipeline)
+├── requirements.txt
+├── utils/
+│   ├── __init__.py
+│   ├── inference.py                   (vLLM wrapper)
+│   ├── predictor.py                   (feature extraction, prediction)
+│   ├── load_balancer.py               (routing strategies)
+│   └── statistics.py                  (statistical testing)
+├── SMART_LOAD_BALANCER.md             (detailed analysis)
+└── IMPLEMENTATION_GUIDE.md            (technical deep-dive)
 ```
 
-**Tail Latency** (not statistically tested)
-```
-P50:  1379ms (smart) vs 2366ms (RR)   → +42%
-P95:  6056ms (smart) vs 6070ms (RR)   → +0.2% (noise)
-P99:  6083ms (smart) vs 6137ms (RR)   → +0.9% (noise)
-```
+## Documentation
 
-P95/P99 improvements are within measurement variance. No bootstrap resampling performed for percentile significance.
+- **SMART_LOAD_BALANCER.md** — Full validation analysis with root cause breakdown
+- **IMPLEMENTATION_GUIDE.md** — Code structure, extension points, debugging guide
 
-**Predictor Accuracy**
-```
-R²:   0.114 (explains 11% of output-length variance)
-MAE:  83.1 tokens
+## Technical Details
 
-Assessment: Weak signal. Predictor barely captures output-length variation.
-Works for binary threshold (>500 vs ≤500) but margin is small.
-```
+### A/B Test Design
+- Sample size: 166 requests per strategy (adaptive scaling)
+- Statistical test: Welch's t-test (unequal variances)
+- Significance level: α = 0.05
+- Confidence intervals: 95%
+
+### GPU Configuration
+- Device: NVIDIA RTX A5000 (24GB VRAM)
+- vLLM: gpu_memory_utilization=0.7, kv_cache_dtype="auto"
+- Sequential model loading with explicit cleanup (gc + torch.cuda.empty_cache())
+
+### Predictor Training
+- Algorithm: Ridge regression (α=1.0)
+- Train/test split: 80/20 on 500 prompts
+- Features: Standardized (zero mean, unit variance)
 
 ## Known Limitations
 
-1. **Single run, not independently replicated** — Results from one unseeded execution (August 2026). A second run would verify stability.
-
-2. **Weak predictor** — R²=0.114 means 89% of output-length variance is unexplained. Binary threshold (500 tokens) works but is margin-sensitive.
-
-3. **P95/P99 unchanged** — Tail latency shows no improvement. Not suitable for strict SLAs (e.g., "P95 < 5s").
-
-4. **Simulated environment** — 3 workers on single GPU. Real distributed cluster has different scaling characteristics (network latency, GPU isolation, multi-tenancy).
-
-5. **Conservative vLLM config** — `enforce_eager=true` disables PagedAttention optimization. Absolute latencies are from slowest vLLM mode, not production baseline.
-
-6. **Single model and dataset** — Validated on Mistral 7B + Alpaca only. Optimal threshold and predictor features likely differ for other models/workloads.
-
-7. **Threshold not validated** — No confusion matrix analysis. Unknown whether 500-token threshold actually separates long-output requests effectively.
-
-## Deployment Recommendations
-
-**Suitable for**:
-- Cost optimization (fewer GPUs needed for same throughput)
-- Average-response-time improvement
-- Best-effort services without strict latency SLAs
-
-**Not suitable for**:
-- Strict tail-latency guarantees (P95/P99 unchanged)
-- Hard real-time requirements
-- Systems where 501ms absolute latency matters (use in addition to other optimizations)
-
-## Troubleshooting
-
-**CUDA Out of Memory**
-- Reduce `gpu_memory_utilization` in config.yaml
-- Lower `max_model_len`
-- Switch to smaller model (Phi-2)
-
-**vLLM Initialization Timeout**
-- Increase timeout in code
-- Check GPU availability: `nvidia-smi`
-- Restart Jupyter kernel
-
-**Results Don't Match Reported Numbers**
-- No fixed random seed. Results vary between runs.
-- Add `np.random.seed(42)` to notebook top for reproducibility.
-
-## Contributing
-
-See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
-
-## License
-
-MIT — see [LICENSE](LICENSE) file
-
-## Architecture & Design
-
-Detailed architectural documentation in [`docs/source/architecture.md`](docs/source/architecture.md).
+1. **Threshold never activates** — 500 tokens exceeds 100th percentile of outputs
+2. **Weak predictor** — 10 surface features explain only 10% of output variance
+3. **Simulated environment** — 3 workers on single GPU; no real network latency or multi-tenancy
+4. **Single dataset** — Alpaca only (instruction-tuning); short-output biased
+5. **No load pressure** — Workers equally available; optimal with queue contention
 
 ## References
 
-**Statistical methodology**: Independent t-test on mean latency with 95% confidence intervals. P-value attached to mean comparison only; percentiles (P95, P99) reported descriptively but not statistically tested.
-
-**Dataset**: Alpaca 52K instruction-following prompts from HuggingFace.
-
-**Model**: Mistral 7B-Instruct-v0.1, open weights, reproducible.
-
----
-
-**Last validated**: August 2026  
-**Status**: Production deployment candidate with known limitations (see above)
-
-## Contributing
-
-See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
+- **vLLM**: https://github.com/vllm-project/vllm
+- **Alpaca Dataset**: https://github.com/tatsu-lab/alpaca
+- **Ridge Regression**: Scikit-learn documentation
+- **Statistical Testing**: Welch's t-test for unequal variances
 
 ## License
 
-MIT - see [LICENSE](LICENSE) file
-
----
-
-**[→ Start with documentation](docs/source/index.md)**
+MIT
