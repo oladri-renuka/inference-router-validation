@@ -1,0 +1,92 @@
+{
+  "model": "meta-llama/Llama-2-7b-chat-hf",
+  "statistics": {
+    "smart_routing": {
+      "mean": 3258.278964513756,
+      "median": 3385.9403133392334,
+      "std": 2044.4088787785909,
+      "p50": 3385.9403133392334,
+      "p95": 5448.89098405838,
+      "p99": 5636.548948287963,
+      "min": 171.15354537963867,
+      "max": 5707.9291343688965,
+      "samples": 166
+    },
+    "round_robin": {
+      "mean": 3295.4870333154518,
+      "median": 3701.8978595733643,
+      "std": 2090.185754099801,
+      "p50": 3701.8978595733643,
+      "p95": 5440.77205657959,
+      "p99": 5599.586844444274,
+      "min": 57.01708793640137,
+      "max": 5809.807538986206,
+      "samples": 166
+    },
+    "comparison": {
+      "p95_improvement_percent": -0.14922381225238002,
+      "p95_ci_smart": [
+        2944.0320910448495,
+        3572.5258379826623
+      ],
+      "p95_ci_round_robin": [
+        2974.203778770241,
+        3616.7702878606624
+      ],
+      "ttest": {
+        "t_statistic": -0.16346867643540747,
+        "p_value": 0.870249499079746,
+        "mean_diff": -37.208068801695845,
+        "significant": 0
+      },
+      "significant_at_0_05": 0
+    },
+    "model": "meta-llama/Llama-2-7b-chat-hf",
+    "predictor_r2": 0.10876494646072388,
+    "predictor_mae": 78.50733184814453
+  },
+  "threshold_validation": {
+    "ridge": {
+      "threshold": 500.0,
+      "true_positive": 0,
+      "true_negative": 100,
+      "false_positive": 0,
+      "false_negative": 0,
+      "accuracy": 1.0,
+      "precision": 0.0,
+      "recall": 0.0,
+      "f1_score": 0.0
+    },
+    "lasso": {
+      "threshold": 500.0,
+      "true_positive": 0,
+      "true_negative": 100,
+      "false_positive": 0,
+      "false_negative": 0,
+      "accuracy": 1.0,
+      "precision": 0.0,
+      "recall": 0.0,
+      "f1_score": 0.0
+    },
+    "elasticnet": {
+      "threshold": 500.0,
+      "true_positive": 0,
+      "true_negative": 100,
+      "false_positive": 0,
+      "false_negative": 0,
+      "accuracy": 1.0,
+      "precision": 0.0,
+      "recall": 0.0,
+      "f1_score": 0.0
+    }
+  },
+  "predictor_accuracy": {
+    "ridge": {
+      "train_r2": 0.11088317632675171,
+      "test_r2": 0.10876494646072388,
+      "test_mae": 78.50733184814453,
+      "train_samples": 400,
+      "test_samples": 100
+    }
+  }
+}
